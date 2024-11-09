@@ -13,8 +13,8 @@ fun main() {
 
         jdbcUrl = "jdbc:mariadb://$dbHost:$dbPort/$dbName"
         driverClassName = "org.mariadb.jdbc.Driver"
-        username = "root"
-        password = "ubhackingdb"
+        username = "ubhack"
+        password = "hacking"
     }
 
     val dbConfig = DatabaseConfig {
