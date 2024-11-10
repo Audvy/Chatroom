@@ -3,7 +3,6 @@ package org.example;
 import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
-import javax.swing.table.TableModel;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.WindowAdapter;
@@ -12,19 +11,20 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 public class Client {
-    private final Socket SOCKET;
-    private final ObjectInputStream in;
+    public final Socket SOCKET;
     private final ObjectOutputStream out;
-    private String username;
-    private static CustomTableModel model;
+    public final ObjectInputStream in;
+    public String username;
+    public CustomTableModel model;
 
-    private DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM/dd/yy HH:mm");
+    public final DateFormat formatter = new SimpleDateFormat("MM/dd/yy HH:mm");
 
     public static void main(String[] args) {
         if (args.length < 1) {
@@ -67,10 +67,11 @@ public class Client {
         frame.addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
-                if(username == null) {
+                if (username == null) {
                     try {
-                        send(new Message(Constants.MESSAGE_FLAGS.LEAVE, null, "[[Unnamed User]]", ZonedDateTime.now()));
-                    } catch (IOException ignore) {}
+                        send(new Message(Constants.MESSAGE_FLAGS.LEAVE, null, "[[Unnamed User]]", System.currentTimeMillis()));
+                    } catch (IOException ignore) {
+                    }
                     System.exit(0);
                 }
             }
@@ -81,12 +82,12 @@ public class Client {
         AbstractAction action = new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if(Pattern.matches("[a-z-A-Z0-9_\\-]{2,12}", input.getText())) {
+                if (Pattern.matches("[a-z-A-Z0-9_\\-]{2,12}", input.getText())) {
                     try {
-                        send(new Message(Constants.MESSAGE_FLAGS.USERNAME_CHECK, null, input.getText(), null));
+                        send(new Message(Constants.MESSAGE_FLAGS.USERNAME_CHECK, null, input.getText(), -1));
                         Message response;
-                        while((response = (Message) in.readObject()) == null);
-                        if(response.FLAG == Constants.MESSAGE_FLAGS.USERNAME_CHECK_FAIL) {
+                        while ((response = (Message) in.readObject()) == null) ;
+                        if (response.FLAG == Constants.MESSAGE_FLAGS.USERNAME_CHECK_FAIL) {
                             errorReport("Username '" + input.getText() + "' is already in use.", "Username in use");
                         } else {
                             username = input.getText();
@@ -115,10 +116,10 @@ public class Client {
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
 
-        while(!finished.get());
+        while (!finished.get()) ;
     }
 
-    private static class CustomTableModel extends DefaultTableModel {
+    public static class CustomTableModel extends DefaultTableModel {
         public CustomTableModel(String... columns) {
             super(null, columns);
         }
@@ -133,17 +134,14 @@ public class Client {
         @Override
         public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
             JLabel l = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-            if(column != 1) return l;
-            if(table.getModel().getValueAt(row, 2) == Constants.MESSAGE_FLAGS.LEAVE) {
-                l.setForeground(Color.RED);
-            } else if(table.getModel().getValueAt(row, 2) == Constants.MESSAGE_FLAGS.JOIN) {
-                l.setForeground(Color.GREEN);
+            if (column != 1) return l;
+            if (table.getModel().getValueAt(row, 2) == Constants.MESSAGE_FLAGS.LEAVE) {
+                l.setForeground(new Color(210, 14, 14));
+            } else if (table.getModel().getValueAt(row, 2) == Constants.MESSAGE_FLAGS.JOIN) {
+                l.setForeground(new Color(13, 166, 13));
+            } else {
+                l.setForeground(Color.BLACK);
             }
-            int fontHeight = this.getFontMetrics(this.getFont()).getHeight() / 3;
-            int textLength = this.getText().length();
-            int lines = textLength / table.getColumnCount() +1;//+1, cause we need at least 1 row.
-            int height = fontHeight * lines;
-            table.setRowHeight(row, height);
 
             return l;
         }
@@ -156,8 +154,9 @@ public class Client {
             @Override
             public void windowClosing(WindowEvent e) {
                 try {
-                    send(new Message(Constants.MESSAGE_FLAGS.LEAVE, null, username, ZonedDateTime.now()));
-                } catch (IOException ignore) {}
+                    send(new Message(Constants.MESSAGE_FLAGS.LEAVE, null, username, System.currentTimeMillis()));
+                } catch (IOException ignore) {
+                }
             }
         });
 
@@ -166,13 +165,45 @@ public class Client {
         JTable table = new JTable(model);
         table.getColumnModel().getColumn(1).setCellRenderer(new CustomColumnRenderer());
         table.removeColumn(table.getColumnModel().getColumn(2));
-        frame.getContentPane().add(BorderLayout.CENTER, table);
+        table.setTableHeader(null);
+        JScrollPane scrollPane = new JScrollPane(table);
+
+        JPanel panel = new JPanel();
+        JLabel label = new JLabel("Type Message:");
+        JTextField input = new JTextField(30);
+
+        AbstractAction action = new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (!input.getText().isBlank()) {
+                    try {
+                        send(new Message(Constants.MESSAGE_FLAGS.MESSAGE, input.getText(), username, System.currentTimeMillis()));
+                    } catch (IOException ex) {
+                        errorReport("Connection to server has been closed.", "No Connection");
+                        System.exit(1);
+                    }
+                    input.setText("");
+                }
+            }
+        };
+
+        input.addActionListener(action);
+        JButton send = new JButton("Send");
+        send.addActionListener(action);
+
+        panel.add(label);
+        panel.add(input);
+        panel.add(send);
+
+        frame.getContentPane().add(BorderLayout.CENTER, scrollPane);
+        frame.getContentPane().add(BorderLayout.SOUTH, panel);
+        frame.pack();
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
 
-        model.addRow(new Object[]{"< " + formatter.format(ZonedDateTime.now()) + " >", "test", Constants.MESSAGE_FLAGS.JOIN});
+        new ReadThread(this).start();
 
-        while(true);
+        while (true) ;
     }
 
     void send(Message m) throws IOException {
@@ -182,5 +213,43 @@ public class Client {
 
     static void errorReport(String text, String title) {
         JOptionPane.showMessageDialog(null, text, title, JOptionPane.ERROR_MESSAGE);
+    }
+}
+
+class ReadThread extends Thread {
+    private Client c;
+
+    public ReadThread(Client c) {
+        this.setDaemon(true);
+        this.c = c;
+    }
+
+    @Override
+    public void run() {
+        try {
+            c.send(new Message(Constants.MESSAGE_FLAGS.BACKLOG_REQUEST));
+        } catch (IOException e) {
+            System.err.println("Sucks to suck");
+            System.exit(1);
+        }
+        Message buffer;
+        while (true) {
+            try {
+                if ((buffer = (Message) c.in.readObject()) != null) {
+                    switch (buffer.FLAG) {
+                        case Constants.MESSAGE_FLAGS.JOIN ->
+                                c.model.addRow(new Object[]{"< " + c.formatter.format(new Date(buffer.TIMESTAMP)) + " >", buffer.USERNAME + " has joined the chat.", buffer.FLAG});
+                        case Constants.MESSAGE_FLAGS.LEAVE ->
+                                c.model.addRow(new Object[]{"< " + c.formatter.format(new Date(buffer.TIMESTAMP)) + " >", buffer.USERNAME + " has left the chat.", buffer.FLAG});
+                        case Constants.MESSAGE_FLAGS.MESSAGE ->
+                                c.model.addRow(new Object[]{"< " + c.formatter.format(new Date(buffer.TIMESTAMP)) + " >", "<" + buffer.USERNAME + "> : " + buffer.MESSAGE, buffer.FLAG});
+                        case BACKLOG_COMPLETE ->
+                                c.send(new Message(Constants.MESSAGE_FLAGS.JOIN, null, c.username, System.currentTimeMillis()));
+                    }
+                }
+            } catch (IOException | ClassNotFoundException e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 }

@@ -11,7 +11,7 @@
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
-        <kotlin.version>2.0.21</kotlin.version>
+        <kotlin.version>2.0.10</kotlin.version>
         <mariadb.version>3.4.1</mariadb.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
@@ -126,6 +126,16 @@
             <artifactId>exposed-jdbc</artifactId>
             <version>0.56.0</version>
             <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>app.softwork</groupId>
+            <artifactId>kotlinx-uuid-exposed</artifactId>
+            <version>0.0.26</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains.exposed</groupId>
+            <artifactId>exposed-dao</artifactId>
+            <version>0.56.0</version>
         </dependency>
 
     </dependencies>

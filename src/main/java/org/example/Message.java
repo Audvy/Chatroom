@@ -1,6 +1,5 @@
 package org.example;
 import java.io.Serializable;
-import java.time.ZonedDateTime;
 
 /**
  * A class used for the messages sent by both the server and clients
@@ -23,7 +22,7 @@ public class Message implements Serializable {
     /**
      * The timestamp of the message
      */
-    final ZonedDateTime TIMESTAMP;
+    final long TIMESTAMP;
 
     /**
      * Creates a {@code Message} with the specified values
@@ -33,7 +32,7 @@ public class Message implements Serializable {
      * @param usr The username of the client that sent this {@code Message}
      * @param time The timestamp of this {@code Message}
      */
-    public Message(Constants.MESSAGE_FLAGS flag, String msg, String usr, ZonedDateTime time) {
+    public Message(Constants.MESSAGE_FLAGS flag, String msg, String usr, long time) {
         FLAG = flag;
         MESSAGE = msg;
         USERNAME = usr;
@@ -46,7 +45,7 @@ public class Message implements Serializable {
      * @param time The timestamp of this {@code Message}
      */
 
-    public Message(Constants.MESSAGE_FLAGS flag, ZonedDateTime time) {
+    public Message(Constants.MESSAGE_FLAGS flag, long time) {
         this(flag, null, null, time);
     }
 
@@ -55,7 +54,7 @@ public class Message implements Serializable {
      * @param flag The flag representing the message type
      */
     public Message(Constants.MESSAGE_FLAGS flag) {
-        this(flag, null, null, null);
+        this(flag, null, null, -1);
     }
 }
 

@@ -7,9 +7,7 @@ import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.UUID;
+import java.util.*;
 
 class ClientHandler {
     protected final Socket SOCKET;
@@ -27,7 +25,9 @@ class ClientHandler {
             in = new ObjectInputStream(sock.getInputStream());
             out = new ObjectOutputStream(sock.getOutputStream());
             System.out.println(UUID.randomUUID());
-        } catch(EOFException ignored) {}
+        } catch(EOFException ignored) {
+            System.out.println("fuck");
+        }
         catch(IOException e) {
             e.printStackTrace();
             System.exit(1);
@@ -38,25 +38,26 @@ class ClientHandler {
 class SendMessage extends Thread {
     /** The message to be sent */
     final Message MESSAGE;
-    final ArrayList<ClientHandler> clients;
 
     /**
      * Create the {@code SendMessage} thread with the supplied message
      * @param msg The message to send to connected clients
      */
-    public SendMessage(Message msg, ArrayList<ClientHandler> clients) {
+    public SendMessage(Message msg) {
         MESSAGE = msg;
-        this.clients = clients;
     }
 
     @Override
     public void run() {
-        for(ClientHandler handler : clients) {
-            if(!handler.SOCKET.isClosed()) {
-                try {
-                    handler.out.writeObject(MESSAGE);
-                    handler.out.flush();
-                } catch (IOException ignore) {}
+        synchronized (ServerBackend.clients) {
+            for (ClientHandler handler : ServerBackend.clients) {
+                if (!handler.SOCKET.isClosed()) {
+                    try {
+                        handler.out.writeObject(MESSAGE);
+                        handler.out.flush();
+                    } catch (IOException ignore) {
+                    }
+                }
             }
         }
     }
@@ -81,18 +82,30 @@ class ClientThread extends Thread {
         while(true) {
             try {
                 if((buffer = (Message) CLIENT.in.readObject()) != null) {
+                    if(buffer.FLAG.log) ServerBackend.connection.addMessage(buffer);
+
                     if(!buffer.FLAG.special){
-                        new SendMessage(buffer, (ArrayList<ClientHandler>) ServerBackend.clients.clone()).start();
+                        new SendMessage(buffer).start();
                         if(buffer.FLAG == Constants.MESSAGE_FLAGS.LEAVE) {
                             System.out.println(buffer.USERNAME + " has left");
                             ServerBackend.clients.remove(CLIENT);
                             if(CLIENT.username != null){
                                 ServerBackend.usernames.remove(CLIENT.username);
                             }
+                            return;
                         }
                     } else {
                         if (buffer.FLAG == Constants.MESSAGE_FLAGS.USERNAME_CHECK) {
                             checkUsername(buffer.USERNAME);
+                        }
+                        if(buffer.FLAG == Constants.MESSAGE_FLAGS.BACKLOG_REQUEST) {
+                            System.out.println("started");
+                            List<Message> messages = ServerBackend.connection.backlog();
+                            for(Message m : messages) {
+                                CLIENT.out.writeObject(m);
+                            }
+                            System.out.println("done");
+                            CLIENT.out.writeObject(new Message(Constants.MESSAGE_FLAGS.BACKLOG_COMPLETE));
                         }
                     }
                 }
@@ -118,9 +131,11 @@ class ClientThread extends Thread {
 }
 
 class ServerBackend extends Thread {
-    static ArrayList<ClientHandler> clients = new ArrayList<>();
+    static final List<ClientHandler> clients = Collections.synchronizedList(new ArrayList<>());
     public static ServerSocket SOCK;
     static HashSet<String> usernames = new HashSet<>();
+
+    static DBConnection connection;
 
     public ServerBackend(String[] args) {
         try {
@@ -132,6 +147,7 @@ class ServerBackend extends Thread {
                 System.err.println("Usage: <port>");
                 System.exit(1);
             }
+            connection = new DBConnection();
         } catch (IOException e) {
             e.printStackTrace();
             System.exit(1);
