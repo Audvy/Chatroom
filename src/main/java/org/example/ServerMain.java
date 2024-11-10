@@ -6,8 +6,10 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.UUID;
 
 class ClientHandler {
     protected final Socket SOCKET;
@@ -24,6 +26,7 @@ class ClientHandler {
         try {
             in = new ObjectInputStream(sock.getInputStream());
             out = new ObjectOutputStream(sock.getOutputStream());
+            System.out.println(UUID.randomUUID());
         } catch(EOFException ignored) {}
         catch(IOException e) {
             e.printStackTrace();
@@ -35,26 +38,25 @@ class ClientHandler {
 class SendMessage extends Thread {
     /** The message to be sent */
     final Message MESSAGE;
+    final ArrayList<ClientHandler> clients;
 
     /**
      * Create the {@code SendMessage} thread with the supplied message
      * @param msg The message to send to connected clients
      */
-    public SendMessage(Message msg) {
+    public SendMessage(Message msg, ArrayList<ClientHandler> clients) {
         MESSAGE = msg;
+        this.clients = clients;
     }
 
     @Override
     public void run() {
-        for(ClientHandler handler : ServerBackend.clients) {
-            try {
-                if(!handler.SOCKET.isClosed()) {
+        for(ClientHandler handler : clients) {
+            if(!handler.SOCKET.isClosed()) {
+                try {
                     handler.out.writeObject(MESSAGE);
                     handler.out.flush();
-                }
-            } catch(IOException e) {
-                e.printStackTrace();
-                System.exit(1);
+                } catch (IOException ignore) {}
             }
         }
     }
@@ -80,8 +82,9 @@ class ClientThread extends Thread {
             try {
                 if((buffer = (Message) CLIENT.in.readObject()) != null) {
                     if(!buffer.FLAG.special){
-                        new SendMessage(buffer).start();
+                        new SendMessage(buffer, (ArrayList<ClientHandler>) ServerBackend.clients.clone()).start();
                         if(buffer.FLAG == Constants.MESSAGE_FLAGS.LEAVE) {
+                            System.out.println(buffer.USERNAME + " has left");
                             ServerBackend.clients.remove(CLIENT);
                             if(CLIENT.username != null){
                                 ServerBackend.usernames.remove(CLIENT.username);
@@ -93,7 +96,7 @@ class ClientThread extends Thread {
                         }
                     }
                 }
-            } catch(EOFException e) {
+            } catch(EOFException | SocketException e) {
                 break;
             } catch(IOException | ClassNotFoundException exc) {
                 exc.printStackTrace();

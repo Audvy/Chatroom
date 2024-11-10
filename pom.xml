@@ -6,7 +6,7 @@
 
     <groupId>org.example</groupId>
     <artifactId>Chatroom</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0</version>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
@@ -15,7 +15,8 @@
         <mariadb.version>3.4.1</mariadb.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-        <client.class>Main</client.class>
+        <client.class>org.example.Client</client.class>
+        <server.class>org.example.ServerMain</server.class>
     </properties>
 
     <dependencyManagement>
@@ -62,9 +63,28 @@
                         <phase>package</phase>
                         <goals><goal>single</goal></goals>
                         <configuration>
+                            <finalName>Client</finalName>
                             <archive>
                                 <manifest>
                                     <mainClass>${client.class}</mainClass>
+                                </manifest>
+                            </archive>
+                            <descriptorRefs>
+                                <descriptorRef>
+                                    jar-with-dependencies
+                                </descriptorRef>
+                            </descriptorRefs>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>make-server</id>
+                        <phase>package</phase>
+                        <goals><goal>single</goal></goals>
+                        <configuration>
+                            <finalName>Server</finalName>
+                            <archive>
+                                <manifest>
+                                    <mainClass>${server.class}</mainClass>
                                 </manifest>
                             </archive>
                             <descriptorRefs>
